@@ -1,0 +1,36 @@
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+    ports:
+      - "${SATMON_MQTT_HOST_PORT:-1883}:1883"
+      - "${SATMON_WS_HOST_PORT:-9001}:9001"
+    volumes:
+      - ./broker/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto-data:/mosquitto/data
+      - mosquitto-log:/mosquitto/log
+
+  cloud-bridge:
+    build:
+      context: ./broker
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    env_file:
+      - ./broker/.env
+    volumes:
+      - ./aws_certs:/app/aws_certs:ro
+
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    ports:
+      - "${SATMON_FRONTEND_PORT:-5173}:5173"
+    environment:
+      SATMON_FRONTEND_PORT: "5173"
+      SATMON_API_TARGET: "${SATMON_API_TARGET:-https://n06cy09ved.execute-api.eu-west-1.amazonaws.com/dev/SatMonHTTP}"
+
+volumes:
+  mosquitto-data:
+  mosquitto-log:

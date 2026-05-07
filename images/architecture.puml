@@ -1,0 +1,70 @@
+@startuml SatMon_Simple_Architecture
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam componentStyle rectangle
+skinparam ArrowColor #40566B
+skinparam rectangle {
+  BorderColor #40566B
+  BackgroundColor #F7FAFC
+  FontColor #172232
+}
+skinparam node {
+  BorderColor #1B6F9F
+  BackgroundColor #EEF6FB
+}
+skinparam cloud {
+  BorderColor #6B5B95
+  BackgroundColor #F6F1FF
+}
+
+left to right direction
+
+title SatMon Simple Architecture
+
+actor "User\nOperator" as User
+
+node "IoT Nodes\nESP32 Satellites" as IotNodes {
+  rectangle "SAT-01" as Sat01
+  rectangle "SAT-02" as Sat02
+  rectangle "SAT-N" as SatN
+}
+
+node "Local Docker Stack" as LocalStack {
+  rectangle "MQTT Broker\nMosquitto" as Broker
+  rectangle "Bridge\nPython MQTT -> Cloud" as Bridge
+  rectangle "Backend\nAWS API reader" as Backend
+  rectangle "Frontend\nMission Dashboard" as Frontend
+}
+
+cloud "Cloud\nAWS IoT + API + storage" as Cloud
+
+Sat01 --> Broker : MQTT telemetry
+Sat02 --> Broker : MQTT telemetry
+SatN --> Broker : MQTT telemetry
+Broker --> Bridge : MQTT messages
+Bridge --> Cloud : publish telemetry
+User --> Frontend : open dashboard
+Frontend --> Backend : telemetry requests
+Backend --> Cloud : fetch telemetry from AWS
+Backend --> Frontend : telemetry responses
+
+note right of Backend
+  Reads from the cloud API only.
+  It does not read from Mosquitto
+  or the bridge locally.
+end note
+
+note bottom
+  Run everything locally with:
+  ./run.sh
+
+  Dashboard:
+  http://localhost:5173
+
+  MQTT broker:
+  localhost:1883
+end note
+
+@enduml

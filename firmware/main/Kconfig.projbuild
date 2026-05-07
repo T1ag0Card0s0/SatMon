@@ -1,0 +1,203 @@
+menu "SatMon Configuration"
+
+    menu "MQTT broker"
+
+        config SATMON_MQTT_BROKER_URI
+            string "Broker URI"
+            default "mqtt://192.168.1.168:1883"
+            help
+                URI of the MQTT broker that receives SatMon sensor payloads.
+                Use mqtt:// for the local Mosquitto broker, or mqtts:// when
+                using TLS certificate validation.
+
+        config SATMON_MPU_MQTT_TOPIC
+            string "MPU-9265 publish topic"
+            default "satmon/mpu9265"
+            help
+                MQTT topic used for periodic MPU sample and error payloads.
+
+        config SATMON_MPU_PUBLISH_INTERVAL_MS
+            int "MPU-9265 publish interval (ms)"
+            default 1000
+            range 10 600000
+            help
+                Time between MPU samples published to MQTT.
+
+        config SATMON_LED_COMMAND_TOPIC_PREFIX
+            string "LED command topic prefix"
+            default "satmon/commands"
+            help
+                MQTT topic prefix used for onboard LED commands. The firmware
+                subscribes to <prefix>/<satellite_id>/led and <prefix>/all/led.
+
+    endmenu
+
+    menu "Onboard RGB LED"
+
+        config SATMON_LED_ENABLE
+            bool "Enable onboard RGB LED command receiver"
+            default y
+            help
+                Enable MQTT control for the ESP32-C6 board's onboard addressable
+                RGB LED.
+
+        config SATMON_LED_GPIO
+            int "Onboard RGB LED GPIO"
+            depends on SATMON_LED_ENABLE
+            default 8
+            range 0 30
+            help
+                GPIO connected to the ESP32-C6 onboard addressable RGB LED. The
+                common ESP32-C6 DevKit boards use GPIO 8.
+
+        config SATMON_LED_BOOT_BLINK_TEST
+            bool "Blink onboard RGB LED at startup"
+            depends on SATMON_LED_ENABLE
+            default y
+            help
+                Blink the onboard RGB LED during startup before Wi-Fi and MQTT
+                are initialized. This is a direct hardware self-test and does
+                not require MQTT commands or cloud connectivity.
+
+    endmenu
+
+    menu "MQTT payload"
+
+        choice SATMON_NODE_PROFILE
+            prompt "Node profile"
+            default SATMON_NODE_PROFILE_SAT01_MPU
+            help
+                Select the satellite node this firmware image is built for.
+                Known profiles set satellite_id and IMU wiring automatically.
+                Use Custom only for hardware outside the SAT-01/SAT-02 setup.
+
+            config SATMON_NODE_PROFILE_SAT01_MPU
+                bool "SAT-01: MPU-92/65"
+
+            config SATMON_NODE_PROFILE_SAT02_GROVE_0X65
+                bool "SAT-02: Grove IMU"
+
+            config SATMON_NODE_PROFILE_CUSTOM
+                bool "Custom"
+
+        endchoice
+
+        config SATMON_SATELLITE_ID
+            string "Satellite ID"
+            depends on SATMON_NODE_PROFILE_CUSTOM
+            default "SAT-01"
+            help
+                Identifier included in every MQTT payload as satellite_id when
+                the node hardware profile is Custom. Known SAT-01/SAT-02
+                profiles set this automatically.
+
+        config SATMON_SNTP_SERVER
+            string "SNTP time server"
+            default "pool.ntp.org"
+            help
+                NTP/SNTP server used to set UTC time for MQTT payload timestamps.
+
+        config SATMON_SNTP_SYNC_TIMEOUT_MS
+            int "Initial SNTP sync timeout (ms)"
+            default 10000
+            range 0 120000
+            help
+                Time to wait after Wi-Fi connects for the first UTC clock sync.
+                Set to 0 to skip waiting; payload timestamps will be null until
+                the system clock has a valid UTC time.
+
+    endmenu
+
+    menu "TLS certificates"
+
+        choice SATMON_CERT_VALIDATION
+            prompt "Broker certificate validation"
+            default SATMON_CERT_VALIDATE_NONE
+            help
+                Choose how the broker's TLS server certificate is validated.
+                This is only used for mqtts:// and wss:// broker URIs.
+
+            config SATMON_CERT_VALIDATE_NONE
+                bool "None (plain MQTT broker)"
+
+            config SATMON_CERT_VALIDATE_BUNDLE
+                bool "ESP-IDF certificate bundle"
+
+            config SATMON_CERT_VALIDATE_MOSQUITTO_CA
+                bool "Embedded Mosquitto CA"
+
+            config SATMON_CERT_VALIDATE_CUSTOM
+                bool "Custom embedded PEM body"
+
+        endchoice
+
+        config SATMON_BROKER_CERTIFICATE_OVERRIDE
+            string "Custom broker certificate PEM body"
+            depends on SATMON_CERT_VALIDATE_CUSTOM
+            default ""
+            help
+                Base64 body of a PEM certificate to embed for broker server
+                validation. Provide only the payload without BEGIN/END markers.
+
+    endmenu
+
+    menu "Custom IMU"
+        depends on SATMON_NODE_PROFILE_CUSTOM
+
+        choice SATMON_IMU_MODEL
+            prompt "IMU model/register map"
+            default SATMON_IMU_MODEL_AUTO
+            help
+                Choose the register map used by the sensor driver. Auto-detect
+                works for known WHO_AM_I values. Force a model when using a
+                board with a known address but an unusual identity response.
+
+            config SATMON_IMU_MODEL_AUTO
+                bool "Auto-detect"
+
+            config SATMON_IMU_MODEL_MPU_FAMILY
+                bool "MPU-60xx/65xx/92xx family"
+
+            config SATMON_IMU_MODEL_LSM6DS_FAMILY
+                bool "LSM6DS family"
+
+        endchoice
+
+        config SATMON_MPU_I2C_ADDR
+            hex "I2C address"
+            default 0x68
+            range 0x08 0x77
+            help
+                IMU I2C address. MPU-925x modules commonly use 0x68 when AD0
+                is low or 0x69 when AD0 is high. Grove IMUs commonly use
+                addresses such as 0x65, 0x6A, or 0x6B depending on the board.
+
+    endmenu
+
+    menu "Wi-Fi connection"
+
+        config SATMON_WIFI_SSID
+            string "Wi-Fi SSID"
+            default ""
+            help
+                Wi-Fi network name used by the SatMon node. This is the only
+                firmware configuration value used for the station SSID.
+
+        config SATMON_WIFI_PASSWORD
+            string "Wi-Fi password"
+            default ""
+            help
+                Wi-Fi password used by the SatMon node. Leave empty only for an
+                open network. This value is stored in sdkconfig by ESP-IDF.
+
+        config SATMON_WIFI_CONN_MAX_RETRY
+            int "Maximum Wi-Fi reconnect retries"
+            default -1
+            range -1 100
+            help
+                Number of reconnect attempts after Wi-Fi disconnects. Use -1 to
+                keep retrying forever.
+
+    endmenu
+
+endmenu

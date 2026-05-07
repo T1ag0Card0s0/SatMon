@@ -1,0 +1,25 @@
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+    ports:
+      - "${SATMON_MQTT_HOST_PORT:-1883}:1883"
+      - "${SATMON_WS_HOST_PORT:-9001}:9001"
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto-data:/mosquitto/data
+      - mosquitto-log:/mosquitto/log
+
+  cloud-bridge:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    env_file:
+      - .env
+    volumes:
+      - ../aws_certs:/app/aws_certs:ro
+
+volumes:
+  mosquitto-data:
+  mosquitto-log:

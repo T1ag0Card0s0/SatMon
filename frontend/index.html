@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SatMon Mission Control</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://unpkg.com/three@0.160.1/build/three.min.js" defer></script>
+    <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <main class="dashboard-shell">
+      <header class="mission-header">
+        <div>
+          <h1>SatMon Mission Control</h1>
+          <p id="apiState">Connecting to SatMon API</p>
+        </div>
+        <div class="header-status">
+          <span class="status-pill" id="healthStatus">Offline</span>
+          <span>Last update: <time id="lastUpdate">--:--:--</time></span>
+        </div>
+      </header>
+
+      <section class="notice" id="notice" hidden></section>
+
+      <section class="metrics-grid" aria-label="Telemetry summary">
+        <article class="metric-card">
+          <span>Online satellites</span>
+          <strong id="activeSatellites">--</strong>
+        </article>
+        <article class="metric-card">
+          <span>Active alerts</span>
+          <strong id="activeAlerts">0</strong>
+        </article>
+        <article class="metric-card">
+          <span>Average temperature</span>
+          <strong id="averageTemperature">--</strong>
+        </article>
+        <article class="metric-card">
+          <span>Packets received</span>
+          <strong id="packetCount">0</strong>
+        </article>
+      </section>
+
+      <section class="content-grid">
+        <section class="panel satellite-panel" aria-labelledby="satelliteStatusTitle">
+          <h2 id="satelliteStatusTitle">Satellite Status</h2>
+          <div class="satellite-grid" id="satelliteGrid"></div>
+        </section>
+
+        <section class="panel alerts-panel" aria-labelledby="alertsTitle">
+          <h2 id="alertsTitle">Alerts</h2>
+          <div class="alert-list" id="alertList"></div>
+        </section>
+      </section>
+
+      <section class="content-grid secondary-grid">
+        <section class="panel graph-panel" aria-labelledby="historyTitle">
+          <h2 id="historyTitle">Telemetry History</h2>
+          <canvas id="historyChart" width="720" height="260" aria-label="Temperature history chart"></canvas>
+        </section>
+
+        <section class="panel attitude-panel" aria-labelledby="attitudeTitle">
+          <h2 id="attitudeTitle">Satellite Attitude</h2>
+          <div class="attitude-viewer" id="attitudeViewer">
+            <canvas id="attitudeCanvas" aria-label="Current satellite orientation"></canvas>
+            <div class="attitude-empty" id="attitudeEmpty">Waiting for gyro data</div>
+          </div>
+          <dl class="attitude-readout" aria-label="Orientation readout">
+            <div>
+              <dt>Satellite</dt>
+              <dd id="attitudeSatellite">--</dd>
+            </div>
+            <div>
+              <dt>Roll</dt>
+              <dd id="attitudeRoll">--</dd>
+            </div>
+            <div>
+              <dt>Pitch</dt>
+              <dd id="attitudePitch">--</dd>
+            </div>
+            <div>
+              <dt>Yaw</dt>
+              <dd id="attitudeYaw">--</dd>
+            </div>
+            <div class="attitude-gyro">
+              <dt>Gyroscope</dt>
+              <dd id="attitudeGyro">--</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="panel controls-panel" aria-labelledby="controlsTitle">
+          <h2 id="controlsTitle">Controls</h2>
+          <div class="controls-layout">
+            <form class="control-card control-form" id="controlForm">
+              <h3>Data</h3>
+              <div class="control-fields">
+                <label class="api-field">
+                  <span>API endpoint</span>
+                  <input id="apiEndpoint" type="url" autocomplete="off">
+                </label>
+                <label>
+                  <span>Selected satellite</span>
+                  <output id="selectedSatelliteLabel">--</output>
+                </label>
+                <label>
+                  <span>Packets</span>
+                  <select id="packetLimit">
+                    <option value="10">10</option>
+                    <option value="25" selected>25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                  </select>
+                </label>
+                <label class="switch-label auto-refresh-field">
+                  <input id="autoRefresh" type="checkbox" checked>
+                  <span>Auto refresh</span>
+                </label>
+              </div>
+            </form>
+
+            <form class="control-card led-form" id="ledForm">
+              <div class="control-card-head">
+                <h3>Onboard LED</h3>
+                <label class="switch-label led-power">
+                  <input id="ledEnabled" type="checkbox">
+                  <span>Enabled</span>
+                </label>
+              </div>
+              <div class="led-fields">
+                <label class="led-target-field">
+                  <span>Target</span>
+                  <select id="ledTarget">
+                    <option value="selected" selected>Selected satellite</option>
+                    <option value="all">All satellites</option>
+                  </select>
+                </label>
+                <label class="color-field">
+                  <span>Color</span>
+                  <input id="ledColor" type="color" value="#14c3b7">
+                </label>
+                <div class="led-preview" id="ledPreview" aria-hidden="true"></div>
+                <button type="submit" id="sendLedButton"><i data-lucide="lightbulb" aria-hidden="true"></i><span>Apply LED</span></button>
+                <output class="led-status" id="ledStatus">Cloud idle</output>
+              </div>
+            </form>
+          </div>
+        </section>
+      </section>
+
+      <section class="panel packets-panel" aria-labelledby="packetsTitle">
+        <h2 id="packetsTitle">Latest Telemetry Packets</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Satellite</th>
+                <th>Timestamp</th>
+                <th>Temperature</th>
+                <th>Accelerometer</th>
+                <th>Gyroscope</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="packetTable"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <footer class="app-footer">ESP32 satellite nodes - MQTT broker - AWS IoT - DynamoDB - REST API - dashboard</footer>
+    </main>
+  </body>
+</html>
